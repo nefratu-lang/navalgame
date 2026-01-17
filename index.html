@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Naval English Tactics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              navy: {
+                900: '#020c1b',
+                800: '#0a192f',
+                700: '#112240',
+              },
+              radar: {
+                DEFAULT: '#64ffda',
+                dim: 'rgba(100, 255, 218, 0.1)',
+                glow: 'rgba(100, 255, 218, 0.5)',
+              },
+              alert: '#ff5f5f'
+            },
+            fontFamily: {
+              mono: ['"Share Tech Mono"', 'monospace'],
+              pixel: ['"VT323"', 'monospace'],
+            },
+            animation: {
+              'spin-slow': 'spin 4s linear infinite',
+              'ping-slow': 'ping 3s cubic-bezier(0, 0, 0.2, 1) infinite',
+              'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #020c1b;
+        color: #64ffda;
+        font-family: 'Share Tech Mono', monospace;
+        overflow: hidden; /* Prevent scroll on mobile for app-feel */
+      }
+      .scanline {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100px;
+        background: linear-gradient(to bottom, transparent, rgba(100, 255, 218, 0.05), transparent);
+        opacity: 0.1;
+        animation: scanline 8s linear infinite;
+        pointer-events: none;
+        z-index: 50;
+      }
+      @keyframes scanline {
+        0% { transform: translateY(-100%); }
+        100% { transform: translateY(100vh); }
+      }
+      .crt-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: radial-gradient(circle, rgba(10,25,47,0) 60%, rgba(2,12,27,0.8) 100%);
+        pointer-events: none;
+        z-index: 40;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "recharts": "https://esm.sh/recharts@^3.6.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <div class="scanline"></div>
+    <div class="crt-overlay"></div>
+  </body>
+</html>
