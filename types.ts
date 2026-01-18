@@ -6,7 +6,7 @@ export enum GameState {
 }
 
 export enum Topic {
-  VOCABULARY = 'Naval Vocabulary & Terms (New)', // Yeni ekledik
+  VOCABULARY = 'Naval Vocabulary & Terms',
   PAST_SIMPLE = 'Past Simple (Was/Were/Irregular)',
   SHOULD_IMPERATIVES = 'Should, Advice & Imperatives',
   PRESENT_CONT_VS_SIMPLE = 'Present Simple vs Continuous',
@@ -34,6 +34,7 @@ export interface GameSession {
     questionCount: number;
     correctCount: number;
   };
+  seenQuestions: Record<string, number>; // Hangi soru kaç kere görüldü?
 }
 
 export interface LeaderboardEntry {
