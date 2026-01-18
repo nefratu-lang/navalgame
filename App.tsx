@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GameState, Topic, Question, GameSession, LeaderboardEntry } from './types';
 import { generateQuestion } from './services/geminiService';
 import { Radar } from './components/Radar';
 import { HealthBar } from './components/HealthBar';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import confetti from 'canvas-confetti';
 
 const MAX_HEALTH = 100;
 const DAMAGE_PER_HIT = 20;
@@ -14,7 +15,7 @@ const App: React.FC = () => {
     score: 0,
     streak: 0,
     health: MAX_HEALTH,
-    rank: 'Cadet',
+    rank: 'ÖĞRENCİ',
     topic: Topic.MIXED,
     history: { questionCount: 0, correctCount: 0 }
   });
@@ -24,16 +25,56 @@ const App: React.FC = () => {
   const [feedback, setFeedback] = useState<{ type: 'correct' | 'wrong', msg: string } | null>(null);
   const [playerName, setPlayerName] = useState("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [shake, setShake] = useState(false);
+
+  // Sound Refs
+  const clickSound = useRef<HTMLAudioElement | null>(null);
+  const correctSound = useRef<HTMLAudioElement | null>(null);
+  const wrongSound = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Initialize sounds (using simple reliable CDNs or generated blobs is safer, but CDNs are easier here)
+    // Using widely available sound effects
+    clickSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3");
+    clickSound.current.volume = 0.5;
+    
+    correctSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3");
+    correctSound.current.volume = 0.6;
+    
+    wrongSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"); // Heavy impact
+    wrongSound.current.volume = 0.6;
+  }, []);
+
+  const playSound = (type: 'click' | 'correct' | 'wrong') => {
+    try {
+      if (type === 'click' && clickSound.current) {
+        clickSound.current.currentTime = 0;
+        clickSound.current.play().catch(() => {});
+      } else if (type === 'correct' && correctSound.current) {
+        correctSound.current.currentTime = 0;
+        correctSound.current.play().catch(() => {});
+      } else if (type === 'wrong' && wrongSound.current) {
+        wrongSound.current.currentTime = 0;
+        wrongSound.current.play().catch(() => {});
+      }
+    } catch (e) {
+      console.warn("Audio play failed", e);
+    }
+  };
 
   const calculateRank = (score: number) => {
-    if (score < 50) return 'Cadet';
-    if (score < 150) return 'Ensign';
-    if (score < 300) return 'Lieutenant';
-    if (score < 600) return 'Commander';
-    return 'Admiral';
+    // Turkish Naval Petty Officer Ranks (NCO)
+    if (score < 50) return 'DZ. ASTSB. ÖĞRENCİSİ';
+    if (score < 150) return 'ASTSUBAY ÇAVUŞ';
+    if (score < 300) return 'KD. ÇAVUŞ';
+    if (score < 500) return 'ÜSTÇAVUŞ';
+    if (score < 750) return 'KD. ÜSTÇAVUŞ';
+    if (score < 1000) return 'BAŞÇAVUŞ';
+    return 'KD. BAŞÇAVUŞ';
   };
 
   const startGame = (topic: Topic) => {
+    playSound('click');
     if (!playerName.trim()) {
       alert("Identify yourself, Sailor!");
       return;
@@ -42,7 +83,7 @@ const App: React.FC = () => {
       score: 0,
       streak: 0,
       health: MAX_HEALTH,
-      rank: 'Cadet',
+      rank: 'DZ. ASTSB. ÖĞRENCİSİ',
       topic: topic,
       history: { questionCount: 0, correctCount: 0 }
     });
@@ -54,6 +95,7 @@ const App: React.FC = () => {
     setLoading(true);
     setFeedback(null);
     setCurrentQuestion(null);
+    setShake(false);
     
     // Artificial delay for "Scanning" radar effect
     setTimeout(async () => {
@@ -61,6 +103,15 @@ const App: React.FC = () => {
       setCurrentQuestion(q);
       setLoading(false);
     }, 1200);
+  };
+
+  const fireConfetti = () => {
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#64ffda', '#ffffff', '#0a192f'] // Naval colors
+    });
   };
 
   const handleAnswer = (selectedOption: string) => {
@@ -73,6 +124,8 @@ const App: React.FC = () => {
     };
 
     if (isCorrect) {
+      playSound('correct');
+      fireConfetti();
       const streakBonus = Math.floor(session.streak / 3) * 10;
       const points = 10 + streakBonus;
       const newScore = session.score + points;
@@ -86,6 +139,10 @@ const App: React.FC = () => {
       }));
       setFeedback({ type: 'correct', msg: `CORRECT! ${currentQuestion.explanation}` });
     } else {
+      playSound('wrong');
+      setShake(true); // Trigger screen shake
+      setTimeout(() => setShake(false), 500);
+
       const newHealth = session.health - DAMAGE_PER_HIT;
       setSession(prev => ({
         ...prev,
@@ -98,6 +155,7 @@ const App: React.FC = () => {
   };
 
   const handleNext = () => {
+    playSound('click');
     if (session.health <= 0) {
       endGame();
     } else {
@@ -123,18 +181,18 @@ const App: React.FC = () => {
   // --------------------------------------------------------------------------
 
   const renderMenu = () => (
-    <div className="flex flex-col items-center justify-center h-full space-y-8 p-4 z-10 animate-fade-in">
-      <div className="text-center space-y-2">
-        <h1 className="text-4xl md:text-6xl font-bold text-radar tracking-tighter drop-shadow-[0_0_10px_rgba(100,255,218,0.5)]">
+    <div className="flex flex-col items-center justify-center h-full w-full space-y-6 p-4 z-10 animate-fade-in overflow-y-auto">
+      <div className="text-center space-y-2 mt-4">
+        <h1 className="text-3xl md:text-5xl font-bold text-radar tracking-tighter drop-shadow-[0_0_10px_rgba(100,255,218,0.5)]">
           NAVAL ENGLISH TACTICS
         </h1>
-        <p className="text-radar-dim text-lg tracking-widest">GRAMMAR SIMULATION MODULE v2.1</p>
+        <p className="text-radar-dim text-md tracking-widest">NCO TRAINING SIMULATION</p>
       </div>
 
       <Radar />
 
       <div className="w-full max-w-md bg-navy-800 border border-radar p-6 rounded-sm shadow-lg">
-        <label className="block text-radar text-sm mb-2 uppercase">Cadet Name</label>
+        <label className="block text-radar text-sm mb-2 uppercase font-bold">Soldier ID / Name</label>
         <input 
           type="text" 
           value={playerName}
@@ -149,32 +207,38 @@ const App: React.FC = () => {
             <button
               key={t}
               onClick={() => startGame(t)}
-              className="w-full text-left p-3 border border-radar-dim text-radar hover:bg-radar hover:text-navy-900 transition-colors uppercase text-sm font-bold truncate"
+              className="w-full text-left p-3 border border-radar-dim text-radar hover:bg-radar hover:text-navy-900 transition-colors uppercase text-xs md:text-sm font-bold truncate active:scale-95 transform duration-100"
             >
               [SELECT] {t}
             </button>
           ))}
         </div>
       </div>
+      <div className="text-radar-dim text-[10px] pb-4">DAMYO SIMULATION PROTOCOL V2.2</div>
     </div>
   );
 
   const renderGame = () => (
-    <div className="flex flex-col h-full max-w-4xl mx-auto p-4 relative z-10">
+    <div className={`flex flex-col h-full w-full max-w-4xl mx-auto p-4 relative z-10 ${shake ? 'animate-shake' : ''}`}>
       {/* HUD Header */}
-      <div className="flex justify-between items-end border-b border-radar-dim pb-4 mb-6">
+      <div className="flex justify-between items-end border-b border-radar-dim pb-4 mb-4">
         <div className="flex-1">
           <HealthBar current={session.health} max={MAX_HEALTH} />
-          <div className="mt-2 text-xs text-radar-dim">RANK: <span className="text-radar text-base font-bold">{session.rank}</span></div>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-xs text-radar-dim">RANK:</span>
+            <span className="text-[#39ff14] text-lg md:text-xl font-bold font-mono tracking-wider drop-shadow-[0_0_5px_rgba(57,255,20,0.6)]">
+              {session.rank}
+            </span>
+          </div>
         </div>
-        <div className="text-right">
+        <div className="text-right pl-4">
           <div className="text-4xl font-mono text-radar font-bold">{session.score.toString().padStart(5, '0')}</div>
           <div className="text-xs text-radar-dim">SCORE</div>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col justify-center items-center">
+      <div className="flex-1 flex flex-col justify-center items-center overflow-y-auto">
         {loading ? (
           <div className="text-center space-y-4">
             <div className="inline-block w-16 h-16 border-4 border-t-radar border-r-transparent border-b-radar border-l-transparent rounded-full animate-spin"></div>
@@ -184,23 +248,26 @@ const App: React.FC = () => {
         ) : currentQuestion ? (
           <div className="w-full space-y-6">
             {/* Scenario Box */}
-            <div className="bg-navy-800 border-l-4 border-radar p-6 shadow-lg">
+            <div className="bg-navy-800 border-l-4 border-radar p-4 md:p-6 shadow-lg relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-2 opacity-20">
+                 <div className="w-16 h-16 border-2 border-radar rounded-full"></div>
+               </div>
               <h3 className="text-radar-dim text-xs uppercase tracking-widest mb-2">Incoming Transmission // Context</h3>
-              <p className="text-xl md:text-2xl text-white font-mono leading-relaxed">
+              <p className="text-lg md:text-2xl text-white font-mono leading-relaxed">
                 "{currentQuestion.scenario}"
               </p>
             </div>
 
             {/* Question Box */}
-            <div className="bg-navy-900 border border-radar-dim p-6">
-              <h3 className="text-radar text-lg mb-4 font-bold">MISSION: {currentQuestion.questionText}</h3>
+            <div className="bg-navy-900 border border-radar-dim p-4 md:p-6">
+              <h3 className="text-radar text-md md:text-lg mb-4 font-bold">MISSION: {currentQuestion.questionText}</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {currentQuestion.options.map((opt, idx) => {
                   let btnClass = "border-radar-dim hover:bg-radar hover:text-navy-900 text-radar";
                   
                   if (feedback) {
-                    if (opt === currentQuestion.correctAnswer) btnClass = "bg-radar text-navy-900 border-radar"; // Always show correct
+                    if (opt === currentQuestion.correctAnswer) btnClass = "bg-radar text-navy-900 border-radar font-bold"; // Always show correct
                     else if (opt === feedback.msg && feedback.type === 'wrong') btnClass = "bg-alert text-white border-alert"; // Show wrong selection
                     else btnClass = "opacity-30 border-transparent"; // Fade others
                   }
@@ -210,9 +277,9 @@ const App: React.FC = () => {
                       key={idx}
                       onClick={() => handleAnswer(opt)}
                       disabled={!!feedback}
-                      className={`p-4 border text-left font-mono transition-all duration-200 uppercase text-lg ${btnClass}`}
+                      className={`p-4 border text-left font-mono transition-all duration-100 uppercase text-lg ${btnClass} active:scale-[0.98]`}
                     >
-                      {String.fromCharCode(65 + idx)}. {opt}
+                      <span className="mr-2 opacity-50">{String.fromCharCode(65 + idx)}.</span> {opt}
                     </button>
                   );
                 })}
@@ -223,14 +290,14 @@ const App: React.FC = () => {
             {feedback && (
               <div className={`p-4 border ${feedback.type === 'correct' ? 'border-radar bg-radar/10' : 'border-alert bg-alert/10'} flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in`}>
                 <div>
-                  <h4 className={`font-bold ${feedback.type === 'correct' ? 'text-radar' : 'text-alert'}`}>
+                  <h4 className={`font-bold text-lg ${feedback.type === 'correct' ? 'text-radar' : 'text-alert'}`}>
                     {feedback.type === 'correct' ? 'TARGET NEUTRALIZED' : 'HULL BREACH DETECTED'}
                   </h4>
                   <p className="text-white text-sm">{feedback.msg}</p>
                 </div>
                 <button 
                   onClick={handleNext}
-                  className="px-8 py-3 bg-white text-navy-900 font-bold hover:bg-gray-200 uppercase tracking-wider"
+                  className="w-full md:w-auto px-8 py-3 bg-white text-navy-900 font-bold hover:bg-gray-200 uppercase tracking-wider shadow-lg transform active:translate-y-1 transition-all"
                 >
                   {session.health <= 0 ? 'Report Status' : 'Next Sector'}
                 </button>
@@ -253,17 +320,17 @@ const App: React.FC = () => {
     ];
 
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 space-y-6 z-10 animate-fade-in">
-        <h2 className="text-5xl text-alert font-bold tracking-tighter">MISSION DEBRIEF</h2>
+      <div className="flex flex-col items-center justify-center h-full w-full p-4 space-y-6 z-10 animate-fade-in overflow-y-auto">
+        <h2 className="text-5xl text-alert font-bold tracking-tighter drop-shadow-lg mt-8">MISSION DEBRIEF</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
           {/* Stats Card */}
-          <div className="bg-navy-800 border border-radar p-6 space-y-4">
+          <div className="bg-navy-800 border border-radar p-6 space-y-4 shadow-2xl">
             <h3 className="text-radar text-xl uppercase border-b border-radar-dim pb-2">Officer Performance</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="text-radar-dim text-xs uppercase">Final Rank</div>
-                <div className="text-2xl text-white font-bold">{session.rank}</div>
+                <div className="text-xl md:text-2xl text-[#39ff14] font-bold font-mono">{session.rank}</div>
               </div>
               <div>
                 <div className="text-radar-dim text-xs uppercase">Total Score</div>
@@ -291,7 +358,7 @@ const App: React.FC = () => {
           </div>
 
           {/* Leaderboard */}
-          <div className="bg-navy-800 border border-radar-dim p-6">
+          <div className="bg-navy-800 border border-radar-dim p-6 shadow-2xl">
             <h3 className="text-radar text-xl uppercase border-b border-radar-dim pb-2 mb-4">Session Leaderboard</h3>
             <div className="space-y-3">
               {leaderboard.map((entry, idx) => (
@@ -299,7 +366,7 @@ const App: React.FC = () => {
                   <span className="text-white font-mono">{idx + 1}. {entry.name}</span>
                   <div className="flex flex-col items-end">
                      <span className="text-radar font-bold">{entry.score}</span>
-                     <span className="text-xs text-radar-dim">{entry.rank}</span>
+                     <span className="text-[10px] text-radar-dim">{entry.rank}</span>
                   </div>
                 </div>
               ))}
@@ -309,8 +376,8 @@ const App: React.FC = () => {
         </div>
 
         <button 
-          onClick={() => setGameState(GameState.MENU)}
-          className="mt-8 px-10 py-4 bg-radar text-navy-900 font-bold text-xl hover:bg-white transition-colors uppercase tracking-widest"
+          onClick={() => { playSound('click'); setGameState(GameState.MENU); }}
+          className="mt-8 px-10 py-4 bg-radar text-navy-900 font-bold text-xl hover:bg-white transition-colors uppercase tracking-widest mb-8"
         >
           Return to Base
         </button>
@@ -319,7 +386,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-navy-900 text-slate-200 font-mono relative overflow-hidden">
+    <div className="h-screen w-screen bg-navy-900 text-slate-200 font-mono relative overflow-hidden flex flex-col">
       {/* Background Grid */}
       <div 
         className="absolute inset-0 z-0 opacity-10 pointer-events-none"

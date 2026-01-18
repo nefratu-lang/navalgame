@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Naval English Tactics</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
@@ -31,17 +31,37 @@
               'spin-slow': 'spin 4s linear infinite',
               'ping-slow': 'ping 3s cubic-bezier(0, 0, 0.2, 1) infinite',
               'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'shake': 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both',
+            },
+            keyframes: {
+              shake: {
+                '10%, 90%': { transform: 'translate3d(-1px, 0, 0)' },
+                '20%, 80%': { transform: 'translate3d(2px, 0, 0)' },
+                '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
+                '40%, 60%': { transform: 'translate3d(4px, 0, 0)' }
+              }
             }
           }
         }
       }
     </script>
     <style>
-      body {
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
         background-color: #020c1b;
+      }
+      body {
         color: #64ffda;
         font-family: 'Share Tech Mono', monospace;
         overflow: hidden; /* Prevent scroll on mobile for app-feel */
+      }
+      #root {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
       }
       .scanline {
         position: fixed;
@@ -74,10 +94,10 @@
 {
   "imports": {
     "react": "https://esm.sh/react@18.2.0",
-    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "react-dom": "https://esm.sh/react-dom@18.2.0",
     "recharts": "https://esm.sh/recharts@2.12.7?external=react,react-dom",
+    "canvas-confetti": "https://esm.sh/canvas-confetti@1.6.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/"
   }
