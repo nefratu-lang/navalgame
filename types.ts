@@ -6,6 +6,7 @@ export enum GameState {
 }
 
 export enum Topic {
+  VOCABULARY = 'Naval Vocabulary & Terms (New)', // Yeni ekledik
   PAST_SIMPLE = 'Past Simple (Was/Were/Irregular)',
   SHOULD_IMPERATIVES = 'Should, Advice & Imperatives',
   PRESENT_CONT_VS_SIMPLE = 'Present Simple vs Continuous',
@@ -16,17 +17,17 @@ export enum Topic {
 
 export interface Question {
   id: string;
-  scenario: string; // The naval context
-  questionText: string; // The actual fill-in-the-blank or question
+  scenario: string;
+  questionText: string;
   options: string[];
   correctAnswer: string;
-  explanation: string; // Why the answer is correct
+  explanation: string;
 }
 
 export interface GameSession {
   score: number;
   streak: number;
-  health: number; // Hull integrity
+  health: number;
   rank: string;
   topic: Topic;
   history: {
