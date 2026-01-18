@@ -11,13 +11,16 @@ const DAMAGE_PER_HIT = 20;
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
+  
+  // SESSION STATE
   const [session, setSession] = useState<GameSession>({
     score: 0,
     streak: 0,
     health: MAX_HEALTH,
     rank: 'ÖĞRENCİ',
     topic: Topic.MIXED,
-    history: { questionCount: 0, correctCount: 0 }
+    history: { questionCount: 0, correctCount: 0 },
+    seenQuestions: {} // Initialize empty map
   });
   
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
@@ -33,15 +36,11 @@ const App: React.FC = () => {
   const wrongSound = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Initialize sounds (using simple reliable CDNs or generated blobs is safer, but CDNs are easier here)
-    // Using widely available sound effects
     clickSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3");
     clickSound.current.volume = 0.5;
-    
     correctSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3");
     correctSound.current.volume = 0.6;
-    
-    wrongSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"); // Heavy impact
+    wrongSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"); 
     wrongSound.current.volume = 0.6;
   }, []);
 
@@ -58,12 +57,11 @@ const App: React.FC = () => {
         wrongSound.current.play().catch(() => {});
       }
     } catch (e) {
-      console.warn("Audio play failed", e);
+      console.warn("Audio error", e);
     }
   };
 
   const calculateRank = (score: number) => {
-    // Turkish Naval Petty Officer Ranks (NCO)
     if (score < 50) return 'DZ. ASTSB. ÖĞRENCİSİ';
     if (score < 150) return 'ASTSUBAY ÇAVUŞ';
     if (score < 300) return 'KD. ÇAVUŞ';
@@ -79,30 +77,38 @@ const App: React.FC = () => {
       alert("Identify yourself, Sailor!");
       return;
     }
-    setSession({
+    
+    // Reset session
+    const newSession: GameSession = {
       score: 0,
       streak: 0,
       health: MAX_HEALTH,
       rank: 'DZ. ASTSB. ÖĞRENCİSİ',
       topic: topic,
-      history: { questionCount: 0, correctCount: 0 }
-    });
+      history: { questionCount: 0, correctCount: 0 },
+      seenQuestions: {} // Clear history on new game
+    };
+    
+    setSession(newSession);
     setGameState(GameState.PLAYING);
-    loadNextQuestion(topic);
+    
+    // Pass the NEW empty map, not the state variable which might be stale
+    loadNextQuestion(topic, newSession.seenQuestions);
   };
 
-  const loadNextQuestion = async (topic: Topic) => {
+  // Modified to accept seenMap
+  const loadNextQuestion = async (topic: Topic, currentSeenMap: Record<string, number>) => {
     setLoading(true);
     setFeedback(null);
     setCurrentQuestion(null);
     setShake(false);
     
-    // Artificial delay for "Scanning" radar effect
     setTimeout(async () => {
-      const q = await generateQuestion(topic);
+      // Pass the map to the service
+      const q = await generateQuestion(topic, currentSeenMap);
       setCurrentQuestion(q);
       setLoading(false);
-    }, 1200);
+    }, 1000);
   };
 
   const fireConfetti = () => {
@@ -110,14 +116,19 @@ const App: React.FC = () => {
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#64ffda', '#ffffff', '#0a192f'] // Naval colors
+      colors: ['#64ffda', '#ffffff', '#0a192f']
     });
   };
 
   const handleAnswer = (selectedOption: string) => {
-    if (!currentQuestion || feedback) return; // Prevent double clicks
+    if (!currentQuestion || feedback) return;
 
     const isCorrect = selectedOption === currentQuestion.correctAnswer;
+    
+    // Update Seen History
+    const updatedSeenMap = { ...session.seenQuestions };
+    updatedSeenMap[currentQuestion.id] = (updatedSeenMap[currentQuestion.id] || 0) + 1;
+
     const newHistory = {
       questionCount: session.history.questionCount + 1,
       correctCount: session.history.correctCount + (isCorrect ? 1 : 0)
@@ -135,12 +146,13 @@ const App: React.FC = () => {
         score: newScore,
         streak: prev.streak + 1,
         rank: calculateRank(newScore),
-        history: newHistory
+        history: newHistory,
+        seenQuestions: updatedSeenMap // Save updated map
       }));
       setFeedback({ type: 'correct', msg: `CORRECT! ${currentQuestion.explanation}` });
     } else {
       playSound('wrong');
-      setShake(true); // Trigger screen shake
+      setShake(true);
       setTimeout(() => setShake(false), 500);
 
       const newHealth = session.health - DAMAGE_PER_HIT;
@@ -148,7 +160,8 @@ const App: React.FC = () => {
         ...prev,
         health: newHealth,
         streak: 0,
-        history: newHistory
+        history: newHistory,
+        seenQuestions: updatedSeenMap // Save updated map
       }));
       setFeedback({ type: 'wrong', msg: `INCORRECT. ${currentQuestion.explanation}` });
     }
@@ -159,7 +172,8 @@ const App: React.FC = () => {
     if (session.health <= 0) {
       endGame();
     } else {
-      loadNextQuestion(session.topic);
+      // Pass the CURRENT session's seen map (which includes the just-answered question)
+      loadNextQuestion(session.topic, session.seenQuestions);
     }
   };
 
@@ -171,15 +185,10 @@ const App: React.FC = () => {
       rank: session.rank,
       date: new Date().toLocaleDateString()
     };
-    
-    // Simple in-memory leaderboard for the session
     setLeaderboard(prev => [...prev, newEntry].sort((a, b) => b.score - a.score).slice(0, 5));
   };
 
-  // --------------------------------------------------------------------------
-  // RENDERERS
-  // --------------------------------------------------------------------------
-
+  // RENDERING
   const renderMenu = () => (
     <div className="flex flex-col items-center justify-center h-full w-full space-y-6 p-4 z-10 animate-fade-in overflow-y-auto">
       <div className="text-center space-y-2 mt-4">
@@ -214,13 +223,12 @@ const App: React.FC = () => {
           ))}
         </div>
       </div>
-      <div className="text-radar-dim text-[10px] pb-4">DAMYO SIMULATION PROTOCOL V2.2</div>
+      <div className="text-radar-dim text-[10px] pb-4">DAMYO SIMULATION PROTOCOL V2.3</div>
     </div>
   );
 
   const renderGame = () => (
     <div className={`flex flex-col h-full w-full max-w-4xl mx-auto p-4 relative z-10 ${shake ? 'animate-shake' : ''}`}>
-      {/* HUD Header */}
       <div className="flex justify-between items-end border-b border-radar-dim pb-4 mb-4">
         <div className="flex-1">
           <HealthBar current={session.health} max={MAX_HEALTH} />
@@ -237,17 +245,14 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col justify-center items-center overflow-y-auto">
         {loading ? (
           <div className="text-center space-y-4">
             <div className="inline-block w-16 h-16 border-4 border-t-radar border-r-transparent border-b-radar border-l-transparent rounded-full animate-spin"></div>
             <p className="text-radar text-xl animate-pulse">SCANNING SECTOR...</p>
-            <p className="text-radar-dim text-xs font-mono">Deciphering enemy transmissions</p>
           </div>
         ) : currentQuestion ? (
           <div className="w-full space-y-6">
-            {/* Scenario Box */}
             <div className="bg-navy-800 border-l-4 border-radar p-4 md:p-6 shadow-lg relative overflow-hidden">
                <div className="absolute top-0 right-0 p-2 opacity-20">
                  <div className="w-16 h-16 border-2 border-radar rounded-full"></div>
@@ -258,7 +263,6 @@ const App: React.FC = () => {
               </p>
             </div>
 
-            {/* Question Box */}
             <div className="bg-navy-900 border border-radar-dim p-4 md:p-6">
               <h3 className="text-radar text-md md:text-lg mb-4 font-bold">MISSION: {currentQuestion.questionText}</h3>
               
@@ -267,9 +271,9 @@ const App: React.FC = () => {
                   let btnClass = "border-radar-dim hover:bg-radar hover:text-navy-900 text-radar";
                   
                   if (feedback) {
-                    if (opt === currentQuestion.correctAnswer) btnClass = "bg-radar text-navy-900 border-radar font-bold"; // Always show correct
-                    else if (opt === feedback.msg && feedback.type === 'wrong') btnClass = "bg-alert text-white border-alert"; // Show wrong selection
-                    else btnClass = "opacity-30 border-transparent"; // Fade others
+                    if (opt === currentQuestion.correctAnswer) btnClass = "bg-radar text-navy-900 border-radar font-bold";
+                    else if (opt === feedback.msg && feedback.type === 'wrong') btnClass = "bg-alert text-white border-alert";
+                    else btnClass = "opacity-30 border-transparent";
                   }
 
                   return (
@@ -286,7 +290,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Feedback / Continue */}
             {feedback && (
               <div className={`p-4 border ${feedback.type === 'correct' ? 'border-radar bg-radar/10' : 'border-alert bg-alert/10'} flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in`}>
                 <div>
@@ -312,7 +315,6 @@ const App: React.FC = () => {
   );
 
   const renderGameOver = () => {
-    // Determine data for chart
     const data = [
       { name: 'Total', value: session.history.questionCount, fill: '#112240' },
       { name: 'Correct', value: session.history.correctCount, fill: '#64ffda' },
@@ -324,7 +326,6 @@ const App: React.FC = () => {
         <h2 className="text-5xl text-alert font-bold tracking-tighter drop-shadow-lg mt-8">MISSION DEBRIEF</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
-          {/* Stats Card */}
           <div className="bg-navy-800 border border-radar p-6 space-y-4 shadow-2xl">
             <h3 className="text-radar text-xl uppercase border-b border-radar-dim pb-2">Officer Performance</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -357,7 +358,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Leaderboard */}
           <div className="bg-navy-800 border border-radar-dim p-6 shadow-2xl">
             <h3 className="text-radar text-xl uppercase border-b border-radar-dim pb-2 mb-4">Session Leaderboard</h3>
             <div className="space-y-3">
@@ -387,7 +387,6 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-navy-900 text-slate-200 font-mono relative overflow-hidden flex flex-col">
-      {/* Background Grid */}
       <div 
         className="absolute inset-0 z-0 opacity-10 pointer-events-none"
         style={{
