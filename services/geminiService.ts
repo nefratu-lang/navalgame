@@ -1,6 +1,6 @@
 import { Topic, Question } from "../types";
 
-// Static Question Database - Expanded to ~100 Questions
+// Static Question Database
 const QUESTION_BANK: Record<string, Question[]> = {
   [Topic.VOCABULARY]: [
     { id: "v1", scenario: "Direction on the ship.", questionText: "The left side of the ship is called _____.", options: ["Starboard", "Port", "Bow", "Stern"], correctAnswer: "Port", explanation: "Left is Port (Red)." },
@@ -99,6 +99,16 @@ const QUESTION_BANK: Record<string, Question[]> = {
   ]
 };
 
+// Helper to shuffle options
+const shuffleArray = <T>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 // Helper to get random question
 const getRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -117,18 +127,13 @@ export const generateQuestion = async (
     pool = QUESTION_BANK[topic] || [];
   }
 
-  // Filter out questions seen 2 or more times
-  // If all questions are exhausted (seen >= 2 times), reset or allow them again
   const MAX_REPEATS = 2;
   let availableQuestions = pool.filter(q => (seenMap[q.id] || 0) < MAX_REPEATS);
 
-  // If we exhausted everything, fall back to the full pool (infinite play)
-  // Or prioritize the ones seen LEAST
   if (availableQuestions.length === 0) {
     availableQuestions = pool; 
   }
 
-  // Extra safety
   if (availableQuestions.length === 0) {
      return {
       id: "err",
@@ -140,6 +145,11 @@ export const generateQuestion = async (
     };
   }
 
-  const selected = getRandom(availableQuestions);
-  return selected;
+  const rawQuestion = getRandom(availableQuestions);
+  
+  // Return a new object with shuffled options
+  return {
+    ...rawQuestion,
+    options: shuffleArray(rawQuestion.options)
+  };
 };
