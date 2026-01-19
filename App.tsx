@@ -20,7 +20,7 @@ const App: React.FC = () => {
     rank: 'ÖĞRENCİ',
     topic: Topic.MIXED,
     history: { questionCount: 0, correctCount: 0 },
-    seenQuestions: {} // Initialize empty map
+    seenQuestions: {} 
   });
   
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
@@ -43,6 +43,18 @@ const App: React.FC = () => {
     wrongSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"); 
     wrongSound.current.volume = 0.6;
   }, []);
+
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((e) => {
+        console.error(`Error attempting to enable full-screen mode: ${e.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
 
   const playSound = (type: 'click' | 'correct' | 'wrong') => {
     try {
@@ -78,7 +90,6 @@ const App: React.FC = () => {
       return;
     }
     
-    // Reset session
     const newSession: GameSession = {
       score: 0,
       streak: 0,
@@ -86,17 +97,14 @@ const App: React.FC = () => {
       rank: 'DZ. ASTSB. ÖĞRENCİSİ',
       topic: topic,
       history: { questionCount: 0, correctCount: 0 },
-      seenQuestions: {} // Clear history on new game
+      seenQuestions: {} 
     };
     
     setSession(newSession);
     setGameState(GameState.PLAYING);
-    
-    // Pass the NEW empty map, not the state variable which might be stale
     loadNextQuestion(topic, newSession.seenQuestions);
   };
 
-  // Modified to accept seenMap
   const loadNextQuestion = async (topic: Topic, currentSeenMap: Record<string, number>) => {
     setLoading(true);
     setFeedback(null);
@@ -104,7 +112,6 @@ const App: React.FC = () => {
     setShake(false);
     
     setTimeout(async () => {
-      // Pass the map to the service
       const q = await generateQuestion(topic, currentSeenMap);
       setCurrentQuestion(q);
       setLoading(false);
@@ -125,7 +132,6 @@ const App: React.FC = () => {
 
     const isCorrect = selectedOption === currentQuestion.correctAnswer;
     
-    // Update Seen History
     const updatedSeenMap = { ...session.seenQuestions };
     updatedSeenMap[currentQuestion.id] = (updatedSeenMap[currentQuestion.id] || 0) + 1;
 
@@ -147,7 +153,7 @@ const App: React.FC = () => {
         streak: prev.streak + 1,
         rank: calculateRank(newScore),
         history: newHistory,
-        seenQuestions: updatedSeenMap // Save updated map
+        seenQuestions: updatedSeenMap 
       }));
       setFeedback({ type: 'correct', msg: `CORRECT! ${currentQuestion.explanation}` });
     } else {
@@ -161,7 +167,7 @@ const App: React.FC = () => {
         health: newHealth,
         streak: 0,
         history: newHistory,
-        seenQuestions: updatedSeenMap // Save updated map
+        seenQuestions: updatedSeenMap 
       }));
       setFeedback({ type: 'wrong', msg: `INCORRECT. ${currentQuestion.explanation}` });
     }
@@ -172,7 +178,6 @@ const App: React.FC = () => {
     if (session.health <= 0) {
       endGame();
     } else {
-      // Pass the CURRENT session's seen map (which includes the just-answered question)
       loadNextQuestion(session.topic, session.seenQuestions);
     }
   };
@@ -387,6 +392,14 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-navy-900 text-slate-200 font-mono relative overflow-hidden flex flex-col">
+      {/* Full Screen Button */}
+      <button 
+        onClick={toggleFullScreen}
+        className="absolute top-4 right-4 z-50 p-2 border border-radar text-radar hover:bg-radar hover:text-navy-900 transition-all text-[10px] font-bold uppercase tracking-tighter bg-navy-900/50"
+      >
+        [Full Screen]
+      </button>
+
       <div 
         className="absolute inset-0 z-0 opacity-10 pointer-events-none"
         style={{
